@@ -47,14 +47,16 @@
     <div id="map" role="region" aria-label="地図"></div>
   </div>
 
-  <!-- Google Maps JavaScript API：APIキーを埋め込み済み -->
+  <!-- Google Maps JavaScript API：あなたのAPIキーを埋め込み済み → 必ずHTTPリファラ制限を設定してください -->
   <script>
     (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring..."):(d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n)))} )({key:"AIzaSyDO2OGfMgwrBf8VM6AxPRNLTwQX8aQXb_8", v:"weekly"});
   </script>
 
   <script>
+    // === 1) 学校位置 ===
     const SCHOOL = { name: "東京都立町田工科高等学校", lat: 35.575472, lng: 139.421472 };
 
+    // === 2) バス停（町田駅方面・リンクは神奈中公式ロケ直リンク） ===
     const STOPS = [
       { stop_id: "machiko_kougyoumae_toward_machida", name: "町田工業高校前（町田駅方面）", lat: 35.57585, lng: 139.4224, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22264&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
       { stop_id: "kamijuku_toward_machida", name: "上宿（町田駅方面）", lat: 35.5769, lng: 139.4247, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22011&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
@@ -62,6 +64,7 @@
       { stop_id: "ja_tadao_branch_toward_machida", name: "JA忠生支店前（町田駅方面）", lat: 35.576848, lng: 139.419378, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22280&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
     ];
 
+    // === 3) フォールバック（API停止時の暫定表示） ===
     const FALLBACK_ARRIVALS = {
       machiko_kougyoumae_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:3 }, { route:"町32", headsign:"町田バスセンター", minutes:12 } ],
       kamijuku_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:7 } ],
@@ -69,12 +72,13 @@
       ja_tadao_branch_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:9 } ],
     };
 
+    // 共有状態
     let map, markers = {}, arrivals = { ...FALLBACK_ARRIVALS };
 
+    // === 4) 地図初期化 ===
     async function initMap() {
       const { Map } = await google.maps.importLibrary("maps");
       const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-      const { InfoWindow } = await google.maps.importLibrary("core");
 
       map = new Map(document.getElementById("map"), {
         center: { lat: SCHOOL.lat, lng: SCHOOL.lng },
@@ -90,7 +94,7 @@
       STOPS.forEach(s => {
         const pin = new PinElement({ scale: 1.1 });
         const marker = new AdvancedMarkerElement({ map, position: { lat: s.lat, lng: s.lng }, title: s.name, content: pin.element });
-        const iw = new InfoWindow({ content: `<b>${s.name}</b>` });
+        const iw = new google.maps.InfoWindow({ content: `<b>${s.name}</b>` });
         marker.addListener("click", () => iw.open({ anchor: marker, map }));
         markers[s.stop_id] = { marker, iw };
         bounds.extend({ lat: s.lat, lng: s.lng });
@@ -98,9 +102,10 @@
 
       map.fitBounds(bounds);
       renderAll();
-      poll();
+      poll(); // 初回取得＆タイマー開始
     }
 
+    // === 5) サイドバー描画 ===
     const stopsEl = document.getElementById('stops');
     const lastEl = document.getElementById('lastUpdated');
 
@@ -119,7 +124,7 @@
         <div class="eta-list">
           ${list.length === 0 ? '<div class="muted" style="margin-top:8px">接近情報なし</div>' : list.map(a => `
             <div class="eta-row">
-              <div><span class="badge">${a.route || '-'} </span> ${a.headsign || ''}</div>
+              <div><span class="badge">${a.route || '-'}</span> ${a.headsign || ''}</div>
               <div>${typeof a.minutes === 'number' ? `約 ${a.minutes} 分` : (a.minutes || '')}</div>
             </div>
           `).join('')}
@@ -141,6 +146,7 @@
       STOPS.forEach(s => stopsEl.appendChild(renderStopCard(s)));
     }
 
+    // === 6) リアルタイム取得（20秒間隔） ===
     async function poll(){
       try{
         const ids = STOPS.map(s=>s.stop_id).join(',');
@@ -159,21 +165,12 @@
       }catch(err){
         lastEl.innerHTML = `<span class="err">取得失敗 — フォールバック表示中</span>`;
       }finally{
-        setTimeout(poll, 20000);
+        setTimeout(poll, 20000); // 20秒ごと
       }
     }
 
+    // 起動
     initMap();
   </script>
-
-  <script>
-  window.addEventListener('error', e => {
-    const div = document.createElement('div');
-    div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fee;color:#900;padding:8px;font:12px/1.4 monospace;z-index:99999';
-    div.textContent = 'JS Error: ' + (e.message || e.error?.message || e.error);
-    document.body.appendChild(div);
-  });
-</script>
-
 </body>
 </html>
