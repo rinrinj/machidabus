@@ -165,5 +165,15 @@
 
     initMap();
   </script>
+
+  <script>
+  window.addEventListener('error', e => {
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#fee;color:#900;padding:8px;font:12px/1.4 monospace;z-index:99999';
+    div.textContent = 'JS Error: ' + (e.message || e.error?.message || e.error);
+    document.body.appendChild(div);
+  });
+</script>
+
 </body>
 </html>
