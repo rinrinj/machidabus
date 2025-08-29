@@ -42,14 +42,15 @@ export const onRequestGet = async ({ request }) => {
 
       // HTMLから <li>…</li> を抜き出してテキストに変換
       const rows = [];
-      const liMatches = html.match(/<li[^>]*>(.*?)<\\/li>/g) || [];
+      const liMatches = html.match(/<li[^>]*>(.*?)<\/li>/g) || [];
       for (const li of liMatches) {
-        const text = li.replace(/<[^>]+>/g, '').replace(/\\s+/g, ' ').trim();
+        const text = li.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
         if (!text) continue;
-        const mMin = text.match(/(約\\s*)?(\\d{1,2})\\s*分/);
+        const mMin = text.match(/(約\s*)?(\d{1,2})\s*分/);
         const mNow = text.match(/到着|発車|まもなく/);
         if (mMin || mNow) {
-          const mRoute = text.match(/[町相川横湘藤他]*\\d{1,3}/);
+          // 「町」「相」「川」「横」「湘」「藤」「他」+数字、または英字+数字 を緩く拾う
+          const mRoute = text.match(/[\u753a\u76f8\u5ddd\u6a2a\u6d32\u85e4\u4ed6]?\d{1,3}/) || text.match(/[A-Za-z]?\d{1,3}/);
           rows.push({
             route: mRoute ? mRoute[0] : '-',
             headsign: text.slice(0, 40),
@@ -61,8 +62,7 @@ export const onRequestGet = async ({ request }) => {
     } catch (e) {
       out[id] = [];
     }
-    // サイトへの負荷を減らすため200ms待機
-    await new Promise((r) => setTimeout(r, 200));
+    // Workers では setTimeout 等の待機は非推奨のため省略（キャッシュで負荷軽減）
   }
 
   // JSONとして返す
