@@ -77,7 +77,7 @@
 
     // === 4) 地図初期化 ===
     async function initMap() {
-      const { Map } = await google.maps.importLibrary("maps");
+      const { Map, InfoWindow } = await google.maps.importLibrary("maps");
       const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
 
       map = new Map(document.getElementById("map"), {
@@ -94,7 +94,7 @@
       STOPS.forEach(s => {
         const pin = new PinElement({ scale: 1.1 });
         const marker = new AdvancedMarkerElement({ map, position: { lat: s.lat, lng: s.lng }, title: s.name, content: pin.element });
-        const iw = new google.maps.InfoWindow({ content: `<b>${s.name}</b>` });
+        const iw = new InfoWindow({ content: `<b>${s.name}</b>` });
         marker.addListener("click", () => iw.open({ anchor: marker, map }));
         markers[s.stop_id] = { marker, iw };
         bounds.extend({ lat: s.lat, lng: s.lng });
