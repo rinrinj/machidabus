@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google Maps テスト</title>
+<style>html,body,#m{height:100%;margin:0} #log{position:fixed;left:0;right:0;bottom:0;background:#111;color:#0f0;font:12px/1.4 monospace;padding:6px;max-height:40%;overflow:auto;opacity:.9}</style>
+</head>
+<body>
+<div id="m" role="region" aria-label="地図"></div>
+<div id="log" aria-live="polite">log:</div>
+<script>
+  function say(x){ const d=document.getElementById('log'); d.textContent = (d.textContent+"\n"+x).slice(-2000); }
+  function initMap(){
+    say('initMap called');
+    try{
+      if(!window.google || !google.maps){ say('google.maps が未定義 → キーが無効/制限/請求/有効化のいずれか'); return; }
+      const m = new google.maps.Map(document.getElementById('m'), {center:{lat:35.575472,lng:139.421472}, zoom:15});
+      const marker = new google.maps.Marker({map:m, position:{lat:35.575472,lng:139.421472}});
+      const iw = new google.maps.InfoWindow({content:'OK: InfoWindow 作成成功'});
+      iw.open({anchor:marker, map:m});
+      say('地図と InfoWindow 初期化 OK');
+    }catch(e){ say('例外: '+(e&&e.message||e)); }
+  }
+  window.addEventListener('error', e=> say('JS Error: '+(e.message||e.error&&e.error.message)));
+</script>
+<!-- ★ここに新しい有効なキーを貼る。デバッグ用に一時的に制限を「なし」にして試し、動いたらすぐリファラ/ API 制限を戻す。 -->
+<script src="https://maps.googleapis.com/maps/api/js?key=【ここに新しいキー】&callback=initMap" async defer></script>
+</body></html>
