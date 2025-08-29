@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>町田工科高校 周辺バス接近マップ（町田駅方面）</title>
+  <meta name="description" content="町田工科高校 周辺のバス停（町田駅方面）の接近情報を表示します。" />
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; }
+    #app { display: grid; grid-template-columns: 360px 1fr; height: 100%; }
+    #sidebar { border-right: 1px solid #e5e7eb; padding: 14px; overflow: auto; }
+    #sidebar h1 { font-size: 18px; margin: 0 0 6px; }
+    #sidebar .muted { color: #6b7280; font-size: 12px; }
+    #map { height: 100%; }
+    .stop-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; margin: 10px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); background:#fff; }
+    .stop-title { font-weight: 700; font-size: 14px; }
+    .eta-row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px dashed #e5e7eb; align-items: baseline; }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #eef2ff; }
+    .btn { display:inline-flex; align-items:center; gap:6px; border:1px solid #d1d5db; padding:6px 10px; border-radius:999px; text-decoration:none; color:#111827; font-size:12px; background:#fff; }
+    .btn:hover{ background:#f9fafb; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+    .legend { font-size: 12px; color:#6b7280; }
+    .updated { font-size: 11px; color:#6b7280; margin-top:6px; }
+    .err { color:#b91c1c; font-size:12px; }
+    @media (max-width: 800px){ #app { grid-template-columns: 1fr; } #sidebar { height: 50vh; } #map { height: 50vh; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar" aria-label="サイドバー：停留所一覧と接近情報">
+      <h1>町田工科高校 周辺バス接近</h1>
+      <div class="muted">対象：<strong>町田駅方面（町田バスセンター行など）</strong></div>
+      <div class="legend">※ 20秒ごとに <code>/api/arrivals</code> から取得。取得できない場合はサンプル表示になります。</div>
+
+      <div id="stops"></div>
+      <div id="lastUpdated" class="updated" aria-live="polite"></div>
+
+      <hr style="margin:12px 0; border:none; border-top:1px solid #eee"/>
+      <details>
+        <summary style="cursor:pointer; font-size:12px; color:#6b7280">埋め込み用 iFrame（簡易）</summary>
+        <p class="muted">Google マップの共有→地図を埋め込む→HTML をコピーで、下のような iFrame でも設置可能（高度な制御はJS版がおすすめ）。</p>
+        <pre style="font-size:12px; white-space:pre-wrap; background:#f9fafb; padding:8px; border-radius:8px; border:1px solid #eee">&lt;iframe
+  src="https://www.google.com/maps?q=35.575472,139.421472&z=15&output=embed"
+  width="100%" height="360" style="border:0" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"&gt;&lt;/iframe&gt;</pre>
+      </details>
+
+      <details>
+        <summary style="cursor:pointer; font-size:12px; color:#6b7280">注意事項</summary>
+        <ul class="muted">
+          <li>教育目的の利用・礼儀的なアクセス（20秒間隔）を守ってください。</li>
+          <li>公式サイトの構造変更で取得が失敗する場合があります。</li>
+          <li>Google Maps の API キーは HTTP リファラ制限（学校サイトのドメイン）を設定してください。</li>
+        </ul>
+      </details>
+    </aside>
+    <div id="map" role="region" aria-label="地図"></div>
+  </div>
+
+  <!-- Google Maps JavaScript API：YOUR_API_KEY を置換してください -->
+  <script>
+    (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring..."):(d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n)))} )({key:"YOUR_API_KEY", v:"weekly"});
+  </script>
+
+  <script>
+    // === 1) 学校位置 ===
+    const SCHOOL = { name: "東京都立町田工科高等学校", lat: 35.575472, lng: 139.421472 };
+
+    // === 2) バス停（町田駅方面・リンクは神奈中公式ロケ直リンク） ===
+    const STOPS = [
+      { stop_id: "machiko_kougyoumae_toward_machida", name: "町田工業高校前（町田駅方面）", lat: 35.57585, lng: 139.4224, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22264&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
+      { stop_id: "kamijuku_toward_machida", name: "上宿（町田駅方面）", lat: 35.5769, lng: 139.4247, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22011&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
+      { stop_id: "tadao_park_toward_machida", name: "忠生公園前（町田駅方面）", lat: 35.5719, lng: 139.4210, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22041&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
+      { stop_id: "ja_tadao_branch_toward_machida", name: "JA忠生支店前（町田駅方面）", lat: 35.576848, lng: 139.419378, links:{ kanachu:"http://real.kanachu.jp/sp/DisplayApproachFrom?fNO=22280&pNO=2", yahoo:"https://map.yahoo.co.jp/" } },
+    ];
+
+    // === 3) フォールバック（API停止時の暫定表示） ===
+    const FALLBACK_ARRIVALS = {
+      machiko_kougyoumae_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:3 }, { route:"町32", headsign:"町田バスセンター", minutes:12 } ],
+      kamijuku_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:7 } ],
+      tadao_park_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:5 } ],
+      ja_tadao_branch_toward_machida: [ { route:"町32", headsign:"町田バスセンター", minutes:9 } ],
+    };
+
+    // 共有状態
+    let map, markers = {}, arrivals = { ...FALLBACK_ARRIVALS };
+
+    // === 4) 地図初期化 ===
+    async function initMap() {
+      const { Map } = await google.maps.importLibrary("maps");
+      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+      const { InfoWindow } = await google.maps.importLibrary("core");
+
+      map = new Map(document.getElementById("map"), {
+        center: { lat: SCHOOL.lat, lng: SCHOOL.lng },
+        zoom: 15,
+        mapId: "DEMO_MAP_ID" // Cloud Console で地図スタイルを作成したら差し替え可
+      });
+
+      new AdvancedMarkerElement({ map, position: { lat: SCHOOL.lat, lng: SCHOOL.lng }, title: SCHOOL.name });
+
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend({ lat: SCHOOL.lat, lng: SCHOOL.lng });
+
+      STOPS.forEach(s => {
+        const pin = new PinElement({ scale: 1.1 });
+        const marker = new AdvancedMarkerElement({ map, position: { lat: s.lat, lng: s.lng }, title: s.name, content: pin.element });
+        const iw = new InfoWindow({ content: `<b>${s.name}</b>` });
+        marker.addListener("click", () => iw.open({ anchor: marker, map }));
+        markers[s.stop_id] = { marker, iw };
+        bounds.extend({ lat: s.lat, lng: s.lng });
+      });
+
+      map.fitBounds(bounds);
+      renderAll();
+      poll(); // 初回取得＆タイマー開始
+    }
+
+    // === 5) サイドバー描画 ===
+    const stopsEl = document.getElementById('stops');
+    const lastEl = document.getElementById('lastUpdated');
+
+    function renderStopCard(stop) {
+      const div = document.createElement('div');
+      div.className = 'stop-card';
+      const list = (arrivals[stop.stop_id] || []).slice(0, 4);
+
+      div.innerHTML = `
+        <div class="stop-title">${stop.name}</div>
+        <div class="row" style="margin-top:6px">
+          <a class="btn" href="${stop.links.kanachu}" target="_blank" rel="noopener">公式ロケ</a>
+          <a class="btn" href="${stop.links.yahoo}" target="_blank" rel="noopener">Yahoo!で確認</a>
+          <button class="btn" data-pan>地図で表示</button>
+        </div>
+        <div class="eta-list">
+          ${list.length === 0 ? '<div class="muted" style="margin-top:8px">接近情報なし</div>' : list.map(a => `
+            <div class="eta-row">
+              <div><span class="badge">${a.route || '-'}</span> ${a.headsign || ''}</div>
+              <div>${typeof a.minutes === 'number' ? `約 ${a.minutes} 分` : (a.minutes || '')}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      div.querySelector('[data-pan]').addEventListener('click', () => {
+        map.panTo({ lat: stop.lat, lng: stop.lng });
+        map.setZoom(17);
+        const { marker, iw } = markers[stop.stop_id];
+        iw.open({ anchor: marker, map });
+      });
+
+      return div;
+    }
+
+    function renderAll() {
+      stopsEl.innerHTML = '';
+      STOPS.forEach(s => stopsEl.appendChild(renderStopCard(s)));
+    }
+
+    // === 6) リアルタイム取得（20秒間隔） ===
+    async function poll(){
+      try{
+        const ids = STOPS.map(s=>s.stop_id).join(',');
+        const res = await fetch(`/api/arrivals?stop_ids=${ids}`, { cache: 'no-store' });
+        if(res.ok){
+          const data = await res.json();
+          if(Object.keys(data).length){
+            arrivals = data;
+            renderAll();
+            const t = new Date();
+            lastEl.textContent = `更新: ${t.toLocaleTimeString('ja-JP', { hour12:false })}`;
+          }
+        } else {
+          lastEl.innerHTML = `<span class="err">サーバ応答エラー (${res.status}) — フォールバック表示中</span>`;
+        }
+      }catch(err){
+        lastEl.innerHTML = `<span class="err">取得失敗 — フォールバック表示中</span>`;
+      }finally{
+        setTimeout(poll, 20000); // 20秒ごと
+      }
+    }
+
+    // 起動
+    initMap();
+  </script>
+</body>
+</html>
